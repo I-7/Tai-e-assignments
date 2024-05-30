@@ -48,6 +48,9 @@ public class ConstantPropagation extends
     public CPFact newBoundaryFact(CFG<Stmt> cfg) {
         CPFact res = new CPFact();
         for (Var v : cfg.getIR().getParams()) {
+            if (!canHoldInt(v)) {
+                continue;
+            }
             try {
                 res.update(v, Value.getNAC());
             } catch (ClassCastException ignored) {
@@ -102,7 +105,9 @@ public class ConstantPropagation extends
                 try {
                     Value tmp = evaluate(rValue, in);
                     if (tmp != null) {
-                        cur.update((Var) stmt.getDef().get(), tmp);
+                        if (canHoldInt((Var) stmt.getDef().get())) {
+                            cur.update((Var) stmt.getDef().get(), tmp);
+                        }
                     }
                 } catch (ClassCastException ignored) {
 
