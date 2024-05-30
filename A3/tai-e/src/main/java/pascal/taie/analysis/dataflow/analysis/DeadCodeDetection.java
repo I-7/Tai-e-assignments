@@ -33,21 +33,9 @@ import pascal.taie.analysis.graph.cfg.CFGBuilder;
 import pascal.taie.analysis.graph.cfg.Edge;
 import pascal.taie.config.AnalysisConfig;
 import pascal.taie.ir.IR;
-import pascal.taie.ir.exp.ArithmeticExp;
-import pascal.taie.ir.exp.ArrayAccess;
-import pascal.taie.ir.exp.CastExp;
-import pascal.taie.ir.exp.FieldAccess;
-import pascal.taie.ir.exp.NewExp;
-import pascal.taie.ir.exp.RValue;
-import pascal.taie.ir.exp.Var;
-import pascal.taie.ir.stmt.AssignStmt;
-import pascal.taie.ir.stmt.If;
-import pascal.taie.ir.stmt.Stmt;
-import pascal.taie.ir.stmt.SwitchStmt;
-
-import java.util.Comparator;
-import java.util.Set;
-import java.util.TreeSet;
+import pascal.taie.ir.exp.*;
+import pascal.taie.ir.stmt.*;
+import java.util.*;
 
 public class DeadCodeDetection extends MethodAnalysis {
 
@@ -69,8 +57,82 @@ public class DeadCodeDetection extends MethodAnalysis {
                 ir.getResult(LiveVariableAnalysis.ID);
         // keep statements (dead code) sorted in the resulting set
         Set<Stmt> deadCode = new TreeSet<>(Comparator.comparing(Stmt::getIndex));
-        // TODO - finish me
-        // Your task is to recognize dead code in ir and add it to deadCode
+        Set<Edge<Stmt>> ignoreEdges = new HashSet<>();
+
+        // If and Branch Statement Unreachable Branches
+        for (Stmt n : cfg.getNodes()) {
+            if (n instanceof If) {
+                Value res = ConstantPropagation.evaluate(((If) n).getCondition(), constants.getInFact(n));
+                if (res.isConstant()) {
+                    if (res.getConstant() == 0) {
+                        for (Edge<Stmt> e : cfg.getOutEdgesOf(n)) {
+                            if (e.getKind() == Edge.Kind.IF_TRUE) {
+                                ignoreEdges.add(e);
+                            }
+                        }
+                    } else {
+                        for (Edge<Stmt> e : cfg.getOutEdgesOf(n)) {
+                            if (e.getKind() == Edge.Kind.IF_FALSE) {
+                                ignoreEdges.add(e);
+                            }
+                        }
+                    }
+                }
+            }
+            if (n instanceof SwitchStmt) {
+                Value res = constants.getInFact(n).get(((SwitchStmt) n).getVar());
+                if (res.isConstant()) {
+                    boolean seen = false;
+                    for (Edge<Stmt> e : cfg.getOutEdgesOf(n)) {
+                        if (e.getKind() == Edge.Kind.SWITCH_CASE) {
+                            if (e.getCaseValue() == res.getConstant()) {
+                                seen = true;
+                            } else {
+                                ignoreEdges.add(e);
+                            }
+                        }
+                    }
+                    if (seen) {
+                        for (Edge<Stmt> e : cfg.getOutEdgesOf(n)) {
+                            if (e.getKind() == Edge.Kind.SWITCH_DEFAULT) {
+                                ignoreEdges.add(e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        for (Stmt n : cfg.getNodes()) {
+            if (n instanceof AssignStmt<?,?>) {
+                if (!liveVars.getOutFact(n).contains((Var) ((AssignStmt<?,?>) n).getLValue())) {
+                    if (hasNoSideEffect(((AssignStmt<?, ?>) n).getRValue())) {
+                        deadCode.add(n);
+                    }
+                }
+            }
+        }
+
+        // Control Flow Unreachable Nodes Detection
+        LinkedList<Stmt> reachable = new LinkedList<>();
+        Set<Stmt> unseen = new TreeSet<>(Comparator.comparing(Stmt::getIndex));
+        unseen.addAll(cfg.getNodes());
+
+        unseen.remove(cfg.getEntry());
+        reachable.push(cfg.getEntry());
+        while (!reachable.isEmpty()) {
+            Stmt n = reachable.pop();
+            for (Edge<Stmt> e : cfg.getOutEdgesOf(n)) {
+                if (!ignoreEdges.contains(e) && unseen.contains(e.getTarget())) {
+                    reachable.push(e.getTarget());
+                    unseen.remove(e.getTarget());
+                }
+            }
+        }
+        unseen.remove(cfg.getExit());
+
+        deadCode.addAll(unseen);
+
         return deadCode;
     }
 
