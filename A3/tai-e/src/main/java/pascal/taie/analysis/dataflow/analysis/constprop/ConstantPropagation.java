@@ -51,7 +51,11 @@ public class ConstantPropagation extends
             if (!canHoldInt(v)) {
                 continue;
             }
-            res.update(v, Value.getNAC());
+            try {
+                res.update(v, Value.getNAC());
+            } catch (ClassCastException ignored) {
+
+            }
         }
         return res;
     }
@@ -98,13 +102,15 @@ public class ConstantPropagation extends
         CPFact cur = in.copy();
         if (stmt.getDef().isPresent()) {
             stmt.getUses().forEach(rValue -> {
-                if (stmt.getDef().get() instanceof  Var) {
+                try {
                     Value tmp = evaluate(rValue, in);
                     if (tmp != null) {
                         if (canHoldInt((Var) stmt.getDef().get())) {
                             cur.update((Var) stmt.getDef().get(), tmp);
                         }
                     }
+                } catch (ClassCastException ignored) {
+
                 }
             });
         }
@@ -150,6 +156,9 @@ public class ConstantPropagation extends
     }
 
     private static Value evaluateBinaryExp(BinaryExp exp, CPFact in) {
+        if (in.get(exp.getOperand1()).isUndef() || in.get(exp.getOperand2()).isUndef()) {
+            return Value.getUndef();
+        }
         if (in.get(exp.getOperand1()).isConstant()) {
             Value tmp = evaluateFromOperand1(exp.getOperator(), in.get(exp.getOperand1()).getConstant());
             if (tmp != null) {
