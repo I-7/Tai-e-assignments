@@ -119,12 +119,12 @@ public class DeadCodeDetection extends MethodAnalysis {
         unseen.addAll(cfg.getNodes());
 
         unseen.remove(cfg.getEntry());
-        reachable.push(cfg.getEntry());
+        reachable.add(cfg.getEntry());
         while (!reachable.isEmpty()) {
             Stmt n = reachable.pop();
             for (Edge<Stmt> e : cfg.getOutEdgesOf(n)) {
                 if (!ignoreEdges.contains(e) && unseen.contains(e.getTarget())) {
-                    reachable.push(e.getTarget());
+                    reachable.add(e.getTarget());
                     unseen.remove(e.getTarget());
                 }
             }
