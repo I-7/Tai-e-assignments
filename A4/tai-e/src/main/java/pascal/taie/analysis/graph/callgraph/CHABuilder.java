@@ -51,10 +51,10 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
         waitlist.add(entry);
         HashSet<JMethod> reachable = new HashSet<>();
 
-
         while (!waitlist.isEmpty()) {
             JMethod m = waitlist.pop();
             if (reachable.add(m)) {
+                callGraph.addReachableMethod(m);
                 m.getIR().forEach(cs -> {
                     if (cs instanceof Invoke) {
                         resolve((Invoke) cs).forEach(m2 -> {
@@ -85,7 +85,7 @@ class CHABuilder implements CGBuilder<Invoke, JMethod> {
         if (callSite.isVirtual() || callSite.isInterface()) {
             LinkedList<JClass> q = new LinkedList<>();
             HashSet<JClass> seen = new HashSet<>();
-            q.push(callSite.getMethodRef().getDeclaringClass());
+            q.add(callSite.getMethodRef().getDeclaringClass());
             seen.add(callSite.getMethodRef().getDeclaringClass());
             while (!q.isEmpty()) {
                 JClass t = q.pop();
