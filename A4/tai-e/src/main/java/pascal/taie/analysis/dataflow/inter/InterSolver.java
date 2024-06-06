@@ -72,9 +72,7 @@ class InterSolver<Method, Node, Fact> {
     private void doSolve() {
         workList = new LinkedList<>();
         HashSet<Node> processed = new HashSet<>();
-        icfg.entryMethods().forEach(method -> {
-            workList.add(icfg.getEntryOf(method));
-        });
+        icfg.entryMethods().forEach(method -> workList.add(icfg.getEntryOf(method)));
         while (!workList.isEmpty()) {
             Node n = workList.poll();
             for (ICFGEdge<Node> e : icfg.getInEdgesOf(n)) {
