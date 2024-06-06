@@ -51,11 +51,7 @@ public class ConstantPropagation extends
             if (!canHoldInt(v)) {
                 continue;
             }
-            try {
-                res.update(v, Value.getNAC());
-            } catch (ClassCastException ignored) {
-
-            }
+            res.update(v, Value.getNAC());
         }
         return res;
     }
@@ -102,15 +98,13 @@ public class ConstantPropagation extends
         CPFact cur = in.copy();
         if (stmt.getDef().isPresent()) {
             stmt.getUses().forEach(rValue -> {
-                try {
+                if (stmt.getDef().get() instanceof Var) {
                     Value tmp = evaluate(rValue, in);
                     if (tmp != null) {
                         if (canHoldInt((Var) stmt.getDef().get())) {
                             cur.update((Var) stmt.getDef().get(), tmp);
                         }
                     }
-                } catch (ClassCastException ignored) {
-
                 }
             });
         }
@@ -143,19 +137,16 @@ public class ConstantPropagation extends
      * @return the resulting {@link Value}
      */
     public static Value evaluate(Exp exp, CPFact in) {
-        try {
+        if (exp instanceof Var) {
             return in.get((Var) exp);
-        } catch (ClassCastException ignored) {
-            try {
-                return Value.makeConstant(((IntLiteral) exp).getValue());
-            } catch (ClassCastException ignored2) {
-                try {
-                    return evaluateBinaryExp((BinaryExp) exp, in);
-                } catch (ClassCastException ignored3) {
-                    return Value.getNAC();
-                }
-            }
         }
+        if (exp instanceof IntLiteral) {
+            return Value.makeConstant(((IntLiteral) exp).getValue());
+        }
+        if (exp instanceof BinaryExp) {
+            return evaluateBinaryExp((BinaryExp) exp, in);
+        }
+        return Value.getNAC();
     }
 
     private static Value evaluateBinaryExp(BinaryExp exp, CPFact in) {
