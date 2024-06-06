@@ -65,17 +65,13 @@ public class LiveVariableAnalysis extends
     public boolean transferNode(Stmt stmt, SetFact<Var> in, SetFact<Var> out) {
         SetFact<Var> cur = out.copy();
         if (stmt.getDef().isPresent()) {
-            try {
+            if (stmt.getDef().get() instanceof Var) {
                 cur.remove((Var) stmt.getDef().get());
-            } catch (ClassCastException ignored) {
-
             }
         }
         for (RValue v : stmt.getUses()) {
-            try {
+            if (v instanceof Var) {
                 cur.add((Var) v);
-            } catch (ClassCastException ignored) {
-
             }
         }
         if (in.equals(cur)) {
