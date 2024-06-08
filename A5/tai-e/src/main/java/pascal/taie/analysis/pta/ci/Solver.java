@@ -137,8 +137,18 @@ class Solver {
             PointsToSet d = propagate(e.pointer(), e.pointsToSet());
             if (e.pointer() instanceof VarPtr ePtr) {
                 d.forEach(obj -> {
-                    //stmtSet.forEach(stmt -> {
-                    //});
+                    ePtr.getVar().getStoreFields().forEach(sf -> {
+                        addPFGEdge(pointerFlowGraph.getVarPtr(sf.getRValue()), pointerFlowGraph.getInstanceField(obj, sf.getFieldRef().resolve()));
+                    });
+                    ePtr.getVar().getLoadFields().forEach(lf -> {
+                        addPFGEdge(pointerFlowGraph.getInstanceField(obj, lf.getFieldRef().resolve()), pointerFlowGraph.getVarPtr(lf.getLValue()));
+                    });
+                    ePtr.getVar().getStoreArrays().forEach(sa -> {
+                        addPFGEdge(pointerFlowGraph.getVarPtr(sa.getRValue()), pointerFlowGraph.getArrayIndex(obj));
+                    });
+                    ePtr.getVar().getLoadArrays().forEach(la -> {
+                        addPFGEdge(pointerFlowGraph.getArrayIndex(obj), pointerFlowGraph.getVarPtr(la.getLValue()));
+                    });
                     processCall(ePtr.getVar(), obj);
                 });
             }
@@ -189,7 +199,9 @@ class Solver {
                     addPFGEdge(pointerFlowGraph.getVarPtr(invokeStmt.getInvokeExp().getArg(i)), pointerFlowGraph.getVarPtr(callee.getIR().getParam(i)));
                 }
                 callee.getIR().getReturnVars().forEach(r -> {
-                    addPFGEdge(pointerFlowGraph.getVarPtr(r), pointerFlowGraph.getVarPtr(invokeStmt.getResult()));
+                    if (invokeStmt.getResult() != null) {
+                        addPFGEdge(pointerFlowGraph.getVarPtr(r), pointerFlowGraph.getVarPtr(invokeStmt.getResult()));
+                    }
                 });
             }
         });
