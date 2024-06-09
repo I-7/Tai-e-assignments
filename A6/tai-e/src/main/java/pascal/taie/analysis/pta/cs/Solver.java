@@ -111,12 +111,13 @@ class Solver {
             if (stmt instanceof Invoke invokeStmt) {
                 if (invokeStmt.isStatic()) {
                     JMethod callee = resolveCallee(null, invokeStmt);
-                    Context ct = contextSelector.selectContext(csManager.getCSCallSite(csMethod.getContext(), invokeStmt), callee);
-                    if (callGraph.addEdge(new Edge<>(CallGraphs.getCallKind(invokeStmt), csManager.getCSCallSite(csMethod.getContext(), invokeStmt), csManager.getCSMethod(ct, callee)))) {
+                    Context c = csMethod.getContext();
+                    Context ct = contextSelector.selectContext(csManager.getCSCallSite(c, invokeStmt), callee);
+                    if (callGraph.addEdge(new Edge<>(CallGraphs.getCallKind(invokeStmt), csManager.getCSCallSite(c, invokeStmt), csManager.getCSMethod(ct, callee)))) {
                         addReachable(csManager.getCSMethod(ct, callee));
                         for (int i = 0; i < invokeStmt.getInvokeExp().getArgCount(); i++) {
                             addPFGEdge(
-                                    csManager.getCSVar(ct, invokeStmt.getInvokeExp().getArg(i)),
+                                    csManager.getCSVar(c, invokeStmt.getInvokeExp().getArg(i)),
                                     csManager.getCSVar(ct, callee.getIR().getParam(i))
                             );
                         }
@@ -124,7 +125,7 @@ class Solver {
                             if (invokeStmt.getResult() != null) {
                                 addPFGEdge(
                                         csManager.getCSVar(ct, r),
-                                        csManager.getCSVar(ct, invokeStmt.getResult())
+                                        csManager.getCSVar(c, invokeStmt.getResult())
                                 );
                             }
                         });
@@ -270,16 +271,17 @@ class Solver {
                 return;
             }
             JMethod callee = resolveCallee(recvObj, invokeStmt);
-            Context ct = contextSelector.selectContext(csManager.getCSCallSite(recv.getContext(), invokeStmt), recvObj, callee);
+            Context c = recv.getContext();
+            Context ct = contextSelector.selectContext(csManager.getCSCallSite(c, invokeStmt), recvObj, callee);
             workList.addEntry(
                     csManager.getCSVar(ct, callee.getIR().getThis()),
                     PointsToSetFactory.make(recvObj)
             );
-            if (callGraph.addEdge(new Edge<>(CallGraphs.getCallKind(invokeStmt), csManager.getCSCallSite(recv.getContext(), invokeStmt), csManager.getCSMethod(ct, callee)))) {
+            if (callGraph.addEdge(new Edge<>(CallGraphs.getCallKind(invokeStmt), csManager.getCSCallSite(c, invokeStmt), csManager.getCSMethod(ct, callee)))) {
                 addReachable(csManager.getCSMethod(ct, callee));
                 for (int i = 0; i < invokeStmt.getInvokeExp().getArgCount(); i++) {
                     addPFGEdge(
-                            csManager.getCSVar(ct, invokeStmt.getInvokeExp().getArg(i)),
+                            csManager.getCSVar(c, invokeStmt.getInvokeExp().getArg(i)),
                             csManager.getCSVar(ct, callee.getIR().getParam(i))
                     );
                 }
@@ -287,7 +289,7 @@ class Solver {
                     if (invokeStmt.getResult() != null) {
                         addPFGEdge(
                                 csManager.getCSVar(ct, r),
-                                csManager.getCSVar(ct, invokeStmt.getResult())
+                                csManager.getCSVar(c, invokeStmt.getResult())
                         );
                     }
                 });
