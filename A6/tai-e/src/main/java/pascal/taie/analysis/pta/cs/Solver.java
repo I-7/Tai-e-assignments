@@ -108,23 +108,29 @@ class Solver {
             return;
         }
         for (Stmt stmt : csMethod.getMethod().getIR().getStmts()) {
-            // TODO - handle static methods
-//            if (stmt instanceof Invoke invokeStmt) {
-//                if (invokeStmt.isStatic()) {
-//                    JMethod callee = resolveCallee(null, invokeStmt);
-//                    if (callGraph.addEdge(new Edge<>(CallGraphs.getCallKind(invokeStmt), invokeStmt, callee))) {
-//                        addReachable(callee);
-//                        for (int i = 0; i < invokeStmt.getInvokeExp().getArgCount(); i++) {
-//                            addPFGEdge(pointerFlowGraph.getVarPtr(invokeStmt.getInvokeExp().getArg(i)), pointerFlowGraph.getVarPtr(callee.getIR().getParam(i)));
-//                        }
-//                        callee.getIR().getReturnVars().forEach(r -> {
-//                            if (invokeStmt.getResult() != null) {
-//                                addPFGEdge(pointerFlowGraph.getVarPtr(r), pointerFlowGraph.getVarPtr(invokeStmt.getResult()));
-//                            }
-//                        });
-//                    }
-//                }
-//            }
+            if (stmt instanceof Invoke invokeStmt) {
+                if (invokeStmt.isStatic()) {
+                    JMethod callee = resolveCallee(null, invokeStmt);
+                    Context ct = contextSelector.selectContext(csManager.getCSCallSite(csMethod.getContext(), invokeStmt), callee);
+                    if (callGraph.addEdge(new Edge<>(CallGraphs.getCallKind(invokeStmt), csManager.getCSCallSite(csMethod.getContext(), invokeStmt), csManager.getCSMethod(ct, callee)))) {
+                        addReachable(csManager.getCSMethod(ct, callee));
+                        for (int i = 0; i < invokeStmt.getInvokeExp().getArgCount(); i++) {
+                            addPFGEdge(
+                                    csManager.getCSVar(ct, invokeStmt.getInvokeExp().getArg(i)),
+                                    csManager.getCSVar(ct, callee.getIR().getParam(i))
+                            );
+                        }
+                        callee.getIR().getReturnVars().forEach(r -> {
+                            if (invokeStmt.getResult() != null) {
+                                addPFGEdge(
+                                        csManager.getCSVar(ct, r),
+                                        csManager.getCSVar(ct, invokeStmt.getResult())
+                                );
+                            }
+                        });
+                    }
+                }
+            }
             if (stmt instanceof AssignStmt<?,?>) {
                 if (stmt instanceof New newStmt) {
                     if (newStmt.getDef().isPresent()) {
@@ -143,17 +149,22 @@ class Solver {
                             csManager.getCSVar(csMethod.getContext(), (Var) copyStmt.getDef().get())
                     );
                 }
-                // TODO - handle static fields
-//                if (stmt instanceof StoreField sf) {
-//                    if (sf.isStatic()) {
-//                        addPFGEdge(pointerFlowGraph.getVarPtr((Var) sf.getUses().get(0)), pointerFlowGraph.getStaticField(sf.getFieldRef().resolve()));
-//                    }
-//                }
-//                if (stmt instanceof LoadField lf) {
-//                    if (lf.isStatic()) {
-//                        addPFGEdge(pointerFlowGraph.getStaticField(lf.getFieldRef().resolve()), pointerFlowGraph.getVarPtr((Var) lf.getDef().get()));
-//                    }
-//                }
+                if (stmt instanceof StoreField sf) {
+                    if (sf.isStatic()) {
+                        addPFGEdge(
+                                csManager.getCSVar(csMethod.getContext(), (Var) sf.getUses().get(0)),
+                                csManager.getStaticField(sf.getFieldRef().resolve())
+                        );
+                    }
+                }
+                if (stmt instanceof LoadField lf) {
+                    if (lf.isStatic()) {
+                        addPFGEdge(
+                                csManager.getStaticField(lf.getFieldRef().resolve()),
+                                csManager.getCSVar(csMethod.getContext(), (Var) lf.getDef().get())
+                        );
+                    }
+                }
             }
         }
     }
@@ -196,19 +207,30 @@ class Solver {
             PointsToSet d = propagate(e.pointer(), e.pointsToSet());
             if (e.pointer() instanceof CSVar ePtr) {
                 d.forEach(obj -> {
-                    // TODO - deal with fields
-//                    ePtr.getVar().getStoreFields().forEach(sf -> {
-//                        addPFGEdge(pointerFlowGraph.getVarPtr(sf.getRValue()), pointerFlowGraph.getInstanceField(obj, sf.getFieldRef().resolve()));
-//                    });
-//                    ePtr.getVar().getLoadFields().forEach(lf -> {
-//                        addPFGEdge(pointerFlowGraph.getInstanceField(obj, lf.getFieldRef().resolve()), pointerFlowGraph.getVarPtr(lf.getLValue()));
-//                    });
-//                    ePtr.getVar().getStoreArrays().forEach(sa -> {
-//                        addPFGEdge(pointerFlowGraph.getVarPtr(sa.getRValue()), pointerFlowGraph.getArrayIndex(obj));
-//                    });
-//                    ePtr.getVar().getLoadArrays().forEach(la -> {
-//                        addPFGEdge(pointerFlowGraph.getArrayIndex(obj), pointerFlowGraph.getVarPtr(la.getLValue()));
-//                    });
+                    ePtr.getVar().getStoreFields().forEach(sf -> {
+                        addPFGEdge(
+                                csManager.getCSVar(ePtr.getContext(), sf.getRValue()),
+                                csManager.getInstanceField(obj, sf.getFieldRef().resolve())
+                        );
+                    });
+                    ePtr.getVar().getLoadFields().forEach(lf -> {
+                        addPFGEdge(
+                                csManager.getInstanceField(obj, lf.getFieldRef().resolve()),
+                                csManager.getCSVar(ePtr.getContext(), lf.getLValue())
+                        );
+                    });
+                    ePtr.getVar().getStoreArrays().forEach(sa -> {
+                        addPFGEdge(
+                                csManager.getCSVar(ePtr.getContext(), sa.getRValue()),
+                                csManager.getArrayIndex(obj)
+                        );
+                    });
+                    ePtr.getVar().getLoadArrays().forEach(la -> {
+                        addPFGEdge(
+                                csManager.getArrayIndex(obj),
+                                csManager.getCSVar(ePtr.getContext(), la.getLValue())
+                        );
+                    });
                     processCall(ePtr, obj);
                 });
             }
