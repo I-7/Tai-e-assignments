@@ -81,7 +81,6 @@ class Solver {
      * Processes new reachable method.
      */
     private void addReachable(JMethod method) {
-        // TODO - finish me
         if (!callGraph.addReachableMethod(method)) {
             return;
         }
